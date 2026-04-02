@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import io from 'socket.io-client';
 
 const socket = io('http://localhost:5000');
-const FLASK_IP = 'http://20.20.20.87:5001';;
+const FLASK_IP = 'http://192.168.1.11';
 
 const getMilTime = () => new Date().toTimeString().slice(0, 8).replace(/:/g, '') + 'Z';
 
@@ -56,26 +56,103 @@ const calcRisk = ({ fog, visibility, wind, humidity, moonPhase, cloudCover, isDa
 
 const WeatherPanel = () => {
   const [time, setTime] = useState(getMilTime());
+  const [wx, setWx] = useState(null);
+  const [loading, setLoading] = useState(true);
+
   useEffect(() => {
     const t = setInterval(() => setTime(getMilTime()), 1000);
     return () => clearInterval(t);
   }, []);
 
-  const wx = {
-    location:   'MUMBAI // 19.07N 72.87E',
-    temp:       86.7,
-    condition:  'CLEAR',
-    isDay:      false,
-    fog:        false,
-    visibility: 10,
-    wind:       12,
-    humidity:   68,
-    cloudCover: 5,
-    pressure:   1012,
-    moonPhase:  0.15,
-    moonLabel:  'WAXING CRESCENT',
-    dewpoint:   74,
-  };
+  useEffect(() => {
+    const fetchWeather = async (lat, lon) => {
+      try {
+        const res = await fetch(
+          `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,relative_humidity_2m,cloud_cover,pressure_msl,wind_speed_10m,is_day,weather_code&hourly=visibility,dew_point_2m&timezone=auto`
+        );
+        const data = await res.json();
+
+        const current = data.current;
+        const nowIndex = data.hourly.time.findIndex(t =>
+          t.startsWith(current.time.slice(0, 13))
+        );
+
+        const visibilityMeters = nowIndex >= 0 ? data.hourly.visibility[nowIndex] : 10000;
+        const dewpointC = nowIndex >= 0 ? data.hourly.dew_point_2m[nowIndex] : 20;
+
+        const visibilityKm = (visibilityMeters / 1000).toFixed(1);
+        const tempF = ((current.temperature_2m * 9) / 5 + 32).toFixed(1);
+        const dewpointF = ((dewpointC * 9) / 5 + 32).toFixed(1);
+
+        const weatherCodeMap = {
+          0: 'CLEAR',
+          1: 'MAINLY CLEAR',
+          2: 'PARTLY CLOUDY',
+          3: 'OVERCAST',
+          45: 'FOG',
+          48: 'RIME FOG',
+          51: 'LIGHT DRIZZLE',
+          53: 'DRIZZLE',
+          55: 'HEAVY DRIZZLE',
+          61: 'LIGHT RAIN',
+          63: 'RAIN',
+          65: 'HEAVY RAIN',
+          71: 'LIGHT SNOW',
+          73: 'SNOW',
+          75: 'HEAVY SNOW',
+          80: 'RAIN SHOWERS',
+          81: 'HEAVY SHOWERS',
+          82: 'VIOLENT SHOWERS',
+          95: 'THUNDERSTORM'
+        };
+
+        setWx({
+          location: `OPS ZONE // ${lat.toFixed(2)}N ${lon.toFixed(2)}E`,
+          temp: parseFloat(tempF),
+          condition: weatherCodeMap[current.weather_code] || 'UNKNOWN',
+          isDay: current.is_day === 1,
+          fog: [45, 48].includes(current.weather_code),
+          visibility: parseFloat(visibilityKm),
+          wind: Math.round(current.wind_speed_10m * 0.54),
+          humidity: current.relative_humidity_2m,
+          cloudCover: current.cloud_cover,
+          pressure: Math.round(current.pressure_msl),
+          moonPhase: 0.5,
+          moonLabel: 'ESTIMATED',
+          dewpoint: parseFloat(dewpointF),
+        });
+
+        setLoading(false);
+      } catch (err) {
+        console.error('Weather fetch failed:', err);
+        setLoading(false);
+      }
+    };
+
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          fetchWeather(pos.coords.latitude, pos.coords.longitude);
+        },
+        () => {
+          fetchWeather(19.0760, 72.8777);
+        }
+      );
+    } else {
+      fetchWeather(19.0760, 72.8777);
+    }
+  }, []);
+
+  if (loading || !wx) {
+    return (
+      <div className="panel" style={{ backgroundColor:C.panel, border:`1px solid ${C.border}`, padding:'12px 14px', position:'relative' }}>
+        <Bx c={C.blue} s={8} />
+        <div style={{ fontSize:'12px', color:C.textDim, letterSpacing:'2px' }}>
+          <span className="blink">_</span> LOADING ENVIRONMENTAL DATA...
+        </div>
+      </div>
+    );
+  }
 
   const risk = calcRisk(wx);
   const rc   = risk >= 70 ? C.red : risk >= 40 ? C.amber : C.green;
@@ -100,8 +177,8 @@ const WeatherPanel = () => {
       threat: wx.cloudCover > 70 ? 'HIGH' : wx.cloudCover > 40 ? 'MED' : 'LOW',
       note: wx.cloudCover > 70 ? 'Overcast — aerial detection impaired' : wx.cloudCover > 40 ? 'Partial cloud' : 'Clear skies — full aerial surveillance' },
     { label:'MOON PHASE',   icon:'☽', val: wx.moonLabel,
-      threat: wx.moonPhase < 0.2 || wx.moonPhase > 0.8 ? 'HIGH' : wx.moonPhase > 0.4 && wx.moonPhase < 0.6 ? 'LOW' : 'MED',
-      note: wx.moonPhase < 0.25 ? 'Near new moon — near-zero illumination' : 'Partial moon — low ambient light' },
+      threat: 'MED',
+      note: 'Moon phase estimated for atmospheric context' },
     { label:'DEW POINT',    icon:'◌', val:`${wx.dewpoint}F`,
       threat: wx.dewpoint > 80 ? 'HIGH' : wx.dewpoint > 70 ? 'MED' : 'LOW',
       note: wx.dewpoint > 80 ? 'High — condensation on sensors likely' : wx.dewpoint > 70 ? 'Elevated — monitor sensors' : 'Low — sensors clear' },
@@ -131,21 +208,20 @@ const WeatherPanel = () => {
 
   return (
     <div style={{ display:'flex', flexDirection:'column', gap:'10px' }}>
-
-      {/* Time / Weather bar — scrolling location & condition */}
+      {/* Time / Weather bar */}
       <div className="panel" style={{ backgroundColor:C.panel, border:`1px solid ${C.border}`, padding:'9px 13px', position:'relative', display:'flex', justifyContent:'space-between', alignItems:'center', overflow:'hidden' }}>
         <Bx c={C.violet} s={8} />
         <div style={{ overflow:'hidden', height:'34px', flex:1 }}>
           <div className="scroll-panel" style={{ animationDuration:'18s' }}>
             <div style={{ fontSize:'14px', color:C.textDim, letterSpacing:'2px' }}>{wx.location}</div>
             <div style={{ fontSize:'16px', color:C.text, marginTop:'2px', letterSpacing:'1px' }}>{wx.condition} // {wx.isDay ? 'DAYLIGHT' : 'NIGHT OPS'}</div>
-            <div style={{ fontSize:'13px', color:C.textDim, letterSpacing:'2px', marginTop:'10px' }}>TEMP {wx.temp}°F // WIND {wx.wind}KT // HUM {wx.humidity}%</div>
-            <div style={{ fontSize:'13px', color:C.textDim, letterSpacing:'2px', marginTop:'4px' }}>PRESSURE {wx.pressure}MB // CLOUD {wx.cloudCover}% // VIS {wx.visibility}KM</div>
-            {/* duplicate for seamless loop */}
+            <div style={{ fontSize:'13px', color:C.textDim, marginTop:'10px' }}>TEMP {wx.temp}°F // WIND {wx.wind}KT // HUM {wx.humidity}%</div>
+            <div style={{ fontSize:'13px', color:C.textDim, marginTop:'4px' }}>PRESSURE {wx.pressure}MB // CLOUD {wx.cloudCover}% // VIS {wx.visibility}KM</div>
+
             <div style={{ fontSize:'14px', color:C.textDim, letterSpacing:'2px', marginTop:'10px' }}>{wx.location}</div>
             <div style={{ fontSize:'16px', color:C.text, marginTop:'2px', letterSpacing:'1px' }}>{wx.condition} // {wx.isDay ? 'DAYLIGHT' : 'NIGHT OPS'}</div>
-            <div style={{ fontSize:'13px', color:C.textDim, letterSpacing:'2px', marginTop:'10px' }}>TEMP {wx.temp}°F // WIND {wx.wind}KT // HUM {wx.humidity}%</div>
-            <div style={{ fontSize:'13px', color:C.textDim, letterSpacing:'2px', marginTop:'4px' }}>PRESSURE {wx.pressure}MB // CLOUD {wx.cloudCover}% // VIS {wx.visibility}KM</div>
+            <div style={{ fontSize:'13px', color:C.textDim, marginTop:'10px' }}>TEMP {wx.temp}°F // WIND {wx.wind}KT // HUM {wx.humidity}%</div>
+            <div style={{ fontSize:'13px', color:C.textDim, marginTop:'4px' }}>PRESSURE {wx.pressure}MB // CLOUD {wx.cloudCover}% // VIS {wx.visibility}KM</div>
           </div>
         </div>
         <div style={{ textAlign:'right', marginLeft:'12px', flexShrink:0 }}>
@@ -154,61 +230,34 @@ const WeatherPanel = () => {
         </div>
       </div>
 
-      {/* Infiltration Risk — slow scroll */}
+      {/* Infiltration Risk */}
       <div className="panel" style={{ backgroundColor:C.panel, border:`1px solid ${rc}55`, padding:'12px 13px', position:'relative', overflow:'hidden' }}>
         <Bx c={rc} s={9} />
         <div style={{ fontSize:'13px', color:C.textDim, letterSpacing:'3px', marginBottom:'8px', fontFamily:"'Oswald',sans-serif" }}>▸ INFILTRATION RISK</div>
-        <div style={{ overflow:'hidden', height:'110px' }}>
-          <div className="scroll-panel" style={{ animationDuration:'22s' }}>
-            {/* block 1 */}
-            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'8px' }}>
-              <div>
-                <div style={{ fontSize:'36px', fontFamily:"'Oswald',sans-serif", color:rc, lineHeight:1, textShadow:`0 0 20px ${rc}66` }}>
-                  {risk}<span style={{ fontSize:'14px' }}>%</span>
-                </div>
-                <div style={{ fontSize:'13px', color:rc, letterSpacing:'3px', marginTop:'2px' }}>{rl} THREAT</div>
-              </div>
-              <div style={{ fontSize:'13px', color:C.textDim, textAlign:'right', lineHeight:2 }}>
-                <div>NIGHT OPS <span style={{ color:C.red }}>+25</span></div>
-                <div>DARK MOON <span style={{ color:C.amber }}>+10</span></div>
-                <div>WIND CALM <span style={{ color:C.green }}>+5</span></div>
-              </div>
+        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'8px' }}>
+          <div>
+            <div style={{ fontSize:'36px', fontFamily:"'Oswald',sans-serif", color:rc, lineHeight:1, textShadow:`0 0 20px ${rc}66` }}>
+              {risk}<span style={{ fontSize:'14px' }}>%</span>
             </div>
-            <div style={{ height:'4px', backgroundColor:C.borderLo, marginBottom:'6px' }}>
-              <div style={{ height:'100%', width:`${risk}%`, background:`linear-gradient(90deg,${C.violet},${rc})`, boxShadow:`0 0 8px ${rc}88` }} />
-            </div>
-            <div style={{ fontSize:'11px', color:C.textDim, letterSpacing:'1px' }}>
-              {risk >= 70 ? '⚠ HEIGHTEN PERIMETER — CONDITIONS FAVOUR INFILTRATOR'
-               : risk >= 40 ? '△ ELEVATED CAUTION — MONITOR ALL SECTORS'
-               : '✓ CONDITIONS UNFAVOURABLE FOR INFILTRATION'}
-            </div>
-            {/* duplicate for seamless loop */}
-            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', margin:'18px 0 8px' }}>
-              <div>
-                <div style={{ fontSize:'36px', fontFamily:"'Oswald',sans-serif", color:rc, lineHeight:1, textShadow:`0 0 20px ${rc}66` }}>
-                  {risk}<span style={{ fontSize:'14px' }}>%</span>
-                </div>
-                <div style={{ fontSize:'13px', color:rc, letterSpacing:'3px', marginTop:'2px' }}>{rl} THREAT</div>
-              </div>
-              <div style={{ fontSize:'13px', color:C.textDim, textAlign:'right', lineHeight:2 }}>
-                <div>NIGHT OPS <span style={{ color:C.red }}>+25</span></div>
-                <div>DARK MOON <span style={{ color:C.amber }}>+10</span></div>
-                <div>WIND CALM <span style={{ color:C.green }}>+5</span></div>
-              </div>
-            </div>
-            <div style={{ height:'4px', backgroundColor:C.borderLo, marginBottom:'6px' }}>
-              <div style={{ height:'100%', width:`${risk}%`, background:`linear-gradient(90deg,${C.violet},${rc})`, boxShadow:`0 0 8px ${rc}88` }} />
-            </div>
-            <div style={{ fontSize:'11px', color:C.textDim, letterSpacing:'1px' }}>
-              {risk >= 70 ? '⚠ HEIGHTEN PERIMETER — CONDITIONS FAVOUR INFILTRATOR'
-               : risk >= 40 ? '△ ELEVATED CAUTION — MONITOR ALL SECTORS'
-               : '✓ CONDITIONS UNFAVOURABLE FOR INFILTRATION'}
-            </div>
+            <div style={{ fontSize:'13px', color:rc, letterSpacing:'3px', marginTop:'2px' }}>{rl} THREAT</div>
           </div>
+          <div style={{ fontSize:'13px', color:C.textDim, textAlign:'right', lineHeight:2 }}>
+            <div>NIGHT OPS <span style={{ color:!wx.isDay ? C.red : C.green }}>{!wx.isDay ? '+25' : '+0'}</span></div>
+            <div>FOG STATUS <span style={{ color:wx.fog ? C.amber : C.green }}>{wx.fog ? '+20' : '+0'}</span></div>
+            <div>VISIBILITY <span style={{ color:wx.visibility < 7 ? C.amber : C.green }}>{wx.visibility < 3 ? '+15' : wx.visibility < 7 ? '+7' : '+0'}</span></div>
+          </div>
+        </div>
+        <div style={{ height:'4px', backgroundColor:C.borderLo, marginBottom:'6px' }}>
+          <div style={{ height:'100%', width:`${risk}%`, background:`linear-gradient(90deg,${C.violet},${rc})`, boxShadow:`0 0 8px ${rc}88` }} />
+        </div>
+        <div style={{ fontSize:'11px', color:C.textDim, letterSpacing:'1px' }}>
+          {risk >= 70 ? '⚠ HEIGHTEN PERIMETER — CONDITIONS FAVOUR INFILTRATOR'
+           : risk >= 40 ? '△ ELEVATED CAUTION — MONITOR ALL SECTORS'
+           : '✓ CONDITIONS UNFAVOURABLE FOR INFILTRATION'}
         </div>
       </div>
 
-      {/* Environmental Factors — slow scroll */}
+      {/* Environmental Factors */}
       <div className="panel" style={{ backgroundColor:C.panel, border:`1px solid ${C.border}`, padding:'12px 13px', position:'relative', overflow:'hidden' }}>
         <Bx c={C.blue} s={9} />
         <div style={{ fontSize:'12px', color:C.blue, letterSpacing:'3px', marginBottom:'10px', borderBottom:`1px solid ${C.borderLo}`, paddingBottom:'6px', fontFamily:"'Oswald',sans-serif" }}>
@@ -217,7 +266,6 @@ const WeatherPanel = () => {
         <div style={{ overflow:'hidden', height:'220px' }}>
           <div className="scroll-panel" style={{ animationDuration:'35s' }}>
             {factorRows}
-            {/* duplicate for seamless loop */}
             <div style={{ marginTop:'16px' }}>{factorRows}</div>
           </div>
         </div>
@@ -228,13 +276,44 @@ const WeatherPanel = () => {
 
 const SurveillanceDashboard = () => {
   const [alerts, setAlerts] = useState([]);
+  const [detections, setDetections] = useState([]);
+  const [zoomedCam, setZoomedCam] = useState(null);
 
   useEffect(() => {
-    socket.on('new_alert', a => setAlerts(prev => [a, ...prev].slice(0, 8)));
-    return () => socket.off('new_alert');
+    const handleAlert = (a) => {
+      setAlerts(prev => [a, ...prev].slice(0, 15));
+    };
+
+    const handleDetection = (d) => {
+      const detection = {
+        camId: d.camId,
+        label: d.label || 'UNKNOWN OBJECT',
+        type: d.type || 'object',
+        suspicious: !!d.suspicious,
+        confidence: d.confidence || 0,
+        timestamp: d.timestamp || new Date().toISOString(),
+      };
+
+      setDetections(prev => [detection, ...prev].slice(0, 30));
+
+      if (detection.suspicious) {
+        setZoomedCam(detection.camId);
+
+        setTimeout(() => {
+          setZoomedCam(current => (current === detection.camId ? null : current));
+        }, 5000);
+      }
+    };
+
+    socket.on('new_alert', handleAlert);
+    socket.on('detection_event', handleDetection);
+
+    return () => {
+      socket.off('new_alert', handleAlert);
+      socket.off('detection_event', handleDetection);
+    };
   }, []);
 
-  // 8 cameras — cam 5 is THERMAL (black & white), all others are colourful
   const cams = [
     { id:1, feed:`${FLASK_IP}/video_feed_1`, label:'MAIN GATE',   sector:'ALPHA',   status:'LIVE',    color:C.green,  thermal:false },
     { id:2, feed:`${FLASK_IP}/video_feed_2`, label:'PERIMETER N', sector:'BRAVO',   status:'LIVE',    color:C.cyan,   thermal:false },
@@ -260,6 +339,24 @@ const SurveillanceDashboard = () => {
     return grades[cam.id] || 'saturate(1.2)';
   };
 
+  const getLatestDetectionForCam = (camId) => {
+    return detections.find(d => d.camId === camId);
+  };
+
+  const combinedActivity = [
+    ...alerts.map(a => ({
+      entryType: 'alert',
+      timestamp: a.timestamp,
+      message: a.message,
+    })),
+    ...detections.map(d => ({
+      entryType: 'detection',
+      ...d,
+    })),
+  ]
+    .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))
+    .slice(0, 25);
+
   return (
     <div style={{
       backgroundColor: C.bg,
@@ -276,6 +373,7 @@ const SurveillanceDashboard = () => {
         @keyframes glow    {0%,100%{text-shadow:0 0 8px #00e87a} 50%{text-shadow:0 0 22px #00e87a,0 0 44px #00e87a33}}
         @keyframes scan    {0%{top:-4px} 100%{top:100%}}
         @keyframes scrollUp {0%{transform:translateY(0)} 100%{transform:translateY(-50%)}}
+        @keyframes dangerPulse {0%,100%{box-shadow:0 0 10px rgba(239,68,68,0.2)} 50%{box-shadow:0 0 24px rgba(239,68,68,0.55)}}
         .blink   {animation:blink 1.4s step-end infinite}
         .flicker {animation:flicker 8s infinite}
         .glow    {animation:glow 3s ease-in-out infinite}
@@ -283,97 +381,256 @@ const SurveillanceDashboard = () => {
         .scan-overlay{position:absolute;inset:0;pointer-events:none;z-index:2;background:repeating-linear-gradient(0deg,transparent,transparent 3px,rgba(0,0,0,.07) 4px)}
         .scan-line{position:absolute;left:0;right:0;height:4px;z-index:3;pointer-events:none;background:linear-gradient(transparent,rgba(0,232,122,.1),transparent);animation:scan 5s linear infinite}
         .panel{position:relative}
+        .danger-pulse{animation:dangerPulse 1s infinite}
         ::-webkit-scrollbar{width:3px}
         ::-webkit-scrollbar-track{background:${C.bg}}
         ::-webkit-scrollbar-thumb{background:${C.blueDim}}
       `}</style>
 
       <div style={{ display:'grid', gridTemplateColumns:'1fr 200px', gap:'12px', alignItems:'start' }}>
-
-        {/* 4×2 camera grid */}
+        {/* Left Side */}
         <div style={{ display:'flex', flexDirection:'column', gap:'10px' }}>
+          {/* 4×2 camera grid */}
           <div style={{ display:'grid', gridTemplateColumns:'repeat(4, 1fr)', gap:'10px' }}>
-            {cams.map(cam => (
-              <div key={cam.id} className="panel flicker" style={{
-                backgroundColor: C.panel,
-                border: `1px solid ${cam.color}44`,
-                position: 'relative',
-                boxShadow: `0 0 16px ${cam.color}12`,
-              }}>
-                <Bx c={cam.color} s={8} />
+            {cams.map(cam => {
+              const latestDetection = getLatestDetectionForCam(cam.id);
+              const isZoomed = zoomedCam === cam.id;
+              const isSuspicious = latestDetection?.suspicious;
 
-                {/* Header */}
-                <div style={{
-                  display:'flex', justifyContent:'space-between', alignItems:'center',
-                  padding:'10px 14px',
-                  backgroundColor:`${cam.color}08`,
-                  borderBottom:`1px solid ${cam.color}2a`,
-                }}>
-                  <span style={{ fontSize:'14px', color:cam.color, letterSpacing:'1px', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis', maxWidth:'72%' }}>
-                    {cam.thermal ? '⬜ THERMAL IR' : `CAM-0${cam.id} // ${cam.label}`}
-                  </span>
-                  <span className={cam.status==='LIVE'?'blink':''} style={{ fontSize:'14px', color:cam.color }}>
-                    {cam.status==='LIVE'?'●':cam.status==='STANDBY'?'◐':'○'}
-                  </span>
-                </div>
+              return (
+                <div
+                  key={cam.id}
+                  className={`panel flicker ${isZoomed ? 'danger-pulse' : ''}`}
+                  style={{
+                    backgroundColor: C.panel,
+                    border: `1px solid ${isSuspicious ? C.red : cam.color}55`,
+                    position: 'relative',
+                    boxShadow: isZoomed
+                      ? `0 0 30px ${C.red}55`
+                      : `0 0 16px ${cam.color}12`,
+                    transform: isZoomed ? 'scale(1.06)' : 'scale(1)',
+                    transition: 'all 0.4s ease',
+                    zIndex: isZoomed ? 20 : 1,
+                  }}
+                >
+                  <Bx c={isSuspicious ? C.red : cam.color} s={8} />
 
-                {/* Feed */}
-                <div style={{ position:'relative', backgroundColor:'#000', aspectRatio:'16/9', overflow:'hidden' }}>
-                  <div className="scan-overlay" />
-                  <div className="scan-line" />
-                  <img
-                    src={cam.feed}
-                    style={{ width:'100%', height:'100%', objectFit:'cover', display:'block', filter:camFilter(cam) }}
-                    alt={`cam${cam.id}`}
-                  />
-                  {/* Crosshair */}
-                  <div style={{ position:'absolute', top:'50%', left:'50%', transform:'translate(-50%,-50%)', width:20, height:20, zIndex:4, pointerEvents:'none' }}>
-                    <div style={{ position:'absolute', top:'50%', left:0, right:0, height:'1px', backgroundColor:`${cam.color}44` }} />
-                    <div style={{ position:'absolute', left:'50%', top:0, bottom:0, width:'1px', backgroundColor:`${cam.color}44` }} />
-                    <div style={{ position:'absolute', top:'50%', left:'50%', transform:'translate(-50%,-50%)', width:5, height:5, border:`1px solid ${cam.color}77`, borderRadius:'50%' }} />
+                  {/* Header */}
+                  <div style={{
+                    display:'flex', justifyContent:'space-between', alignItems:'center',
+                    padding:'10px 14px',
+                    backgroundColor:`${(isSuspicious ? C.red : cam.color)}08`,
+                    borderBottom:`1px solid ${(isSuspicious ? C.red : cam.color)}2a`,
+                  }}>
+                    <span style={{ fontSize:'14px', color:isSuspicious ? C.red : cam.color, letterSpacing:'1px', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis', maxWidth:'72%' }}>
+                      {cam.thermal ? '⬜ THERMAL IR' : `CAM-0${cam.id} // ${cam.label}`}
+                    </span>
+                    <span className={cam.status==='LIVE'?'blink':''} style={{ fontSize:'14px', color:isSuspicious ? C.red : cam.color }}>
+                      {cam.status==='LIVE'?'●':cam.status==='STANDBY'?'◐':'○'}
+                    </span>
                   </div>
-                  {/* Badges */}
-                  <div style={{ position:'absolute', top:5, right:6, fontSize:'9px', color:`${cam.color}cc`, zIndex:4, border:`1px solid ${cam.color}33`, padding:'1px 5px', backgroundColor:'rgba(0,0,0,0.65)' }}>
-                    0{cam.id}
-                  </div>
-                  {cam.thermal && (
-                    <div style={{ position:'absolute', bottom:5, left:6, fontSize:'9px', color:'#fff', zIndex:4, border:'1px solid #fff3', padding:'1px 5px', backgroundColor:'rgba(0,0,0,0.7)', letterSpacing:'1px' }}>
-                      IR
+
+                  {/* Feed */}
+                  <div style={{ position:'relative', backgroundColor:'#000', aspectRatio:'16/9', overflow:'hidden' }}>
+                    <div className="scan-overlay" />
+                    <div className="scan-line" />
+
+                    <img
+                      src={cam.feed}
+                      style={{
+                        width:'100%',
+                        height:'100%',
+                        objectFit:'cover',
+                        display:'block',
+                        filter:camFilter(cam),
+                        transform: isZoomed ? 'scale(1.25)' : 'scale(1)',
+                        transition: 'transform 0.5s ease',
+                      }}
+                      alt={`cam${cam.id}`}
+                    />
+
+                    {/* Detection badge */}
+                    {latestDetection && (
+                      <div
+                        style={{
+                          position:'absolute',
+                          top:5,
+                          left:6,
+                          fontSize:'9px',
+                          color: latestDetection.suspicious ? C.red : C.green,
+                          zIndex:4,
+                          border:`1px solid ${latestDetection.suspicious ? C.red : C.green}55`,
+                          padding:'2px 6px',
+                          backgroundColor:'rgba(0,0,0,0.75)',
+                          letterSpacing:'1px',
+                          fontWeight:'bold'
+                        }}
+                      >
+                        {latestDetection.suspicious ? '⚠ SUSPICIOUS' : '✓ DETECTED'}
+                      </div>
+                    )}
+
+                    {/* Auto tracking overlay */}
+                    {isZoomed && (
+                      <div
+                        style={{
+                          position:'absolute',
+                          bottom:28,
+                          left:6,
+                          fontSize:'8px',
+                          color:C.red,
+                          zIndex:4,
+                          border:`1px solid ${C.red}55`,
+                          padding:'2px 6px',
+                          backgroundColor:'rgba(0,0,0,0.7)',
+                          letterSpacing:'2px'
+                        }}
+                      >
+                        AUTO TRACKING...
+                      </div>
+                    )}
+
+                    {/* Crosshair */}
+                    <div style={{ position:'absolute', top:'50%', left:'50%', transform:'translate(-50%,-50%)', width:20, height:20, zIndex:4, pointerEvents:'none' }}>
+                      <div style={{ position:'absolute', top:'50%', left:0, right:0, height:'1px', backgroundColor:`${isSuspicious ? C.red : cam.color}44` }} />
+                      <div style={{ position:'absolute', left:'50%', top:0, bottom:0, width:'1px', backgroundColor:`${isSuspicious ? C.red : cam.color}44` }} />
+                      <div style={{ position:'absolute', top:'50%', left:'50%', transform:'translate(-50%,-50%)', width:5, height:5, border:`1px solid ${isSuspicious ? C.red : cam.color}77`, borderRadius:'50%' }} />
                     </div>
-                  )}
-                  <div style={{ position:'absolute', bottom:5, right:6, fontSize:'8px', color:`${cam.color}88`, zIndex:4 }}>
-                    {`${30+cam.id*7}N`}
+
+                    {/* Badges */}
+                    <div style={{ position:'absolute', top:5, right:6, fontSize:'9px', color:`${isSuspicious ? C.red : cam.color}cc`, zIndex:4, border:`1px solid ${isSuspicious ? C.red : cam.color}33`, padding:'1px 5px', backgroundColor:'rgba(0,0,0,0.65)' }}>
+                      0{cam.id}
+                    </div>
+
+                    {cam.thermal && (
+                      <div style={{ position:'absolute', bottom:5, left:6, fontSize:'9px', color:'#fff', zIndex:4, border:'1px solid #fff3', padding:'1px 5px', backgroundColor:'rgba(0,0,0,0.7)', letterSpacing:'1px' }}>
+                        IR
+                      </div>
+                    )}
+
+                    <div style={{ position:'absolute', bottom:5, right:6, fontSize:'8px', color:`${isSuspicious ? C.red : cam.color}88`, zIndex:4 }}>
+                      {`${30+cam.id*7}N`}
+                    </div>
+                  </div>
+
+                  {/* Footer */}
+                  <div style={{ padding:'9px 14px', display:'flex', justifyContent:'space-between', fontSize:'13px', color:C.textDim, borderTop:`1px solid ${(isSuspicious ? C.red : cam.color)}1a` }}>
+                    <span>{cam.sector}</span>
+                    <span>30FPS</span>
                   </div>
                 </div>
-
-                {/* Footer */}
-                <div style={{ padding:'9px 14px', display:'flex', justifyContent:'space-between', fontSize:'13px', color:C.textDim, borderTop:`1px solid ${cam.color}1a` }}>
-                  <span>{cam.sector}</span>
-                  <span>30FPS</span>
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
 
-          {/* Incident log */}
-          <div className="panel" style={{ backgroundColor:C.panel, border:`1px solid ${C.border}`, padding:'10px 14px', position:'relative', maxHeight:'110px' }}>
+          {/* Unified Activity Feed */}
+          <div
+            className="panel"
+            style={{
+              backgroundColor: C.panel,
+              border: `1px solid ${C.border}`,
+              padding: '10px 14px',
+              position: 'relative',
+              maxHeight: '260px',
+              overflow: 'hidden'
+            }}
+          >
             <Bx c={C.violet} s={8} />
-            <div style={{ fontSize:'8px', color:C.violet, letterSpacing:'3px', marginBottom:'7px', fontFamily:"'Oswald',sans-serif" }}>▸ INCIDENT LOG</div>
-            <div style={{ overflowY:'auto', maxHeight:'65px', display:'flex', flexDirection:'column', gap:'5px' }}>
-              {alerts.length === 0
-                ? <span style={{ fontSize:'8px', color:C.textDim, letterSpacing:'2px' }}><span className="blink">_</span> MONITORING ALL SECTORS...</span>
-                : alerts.map((a,i) => (
-                    <div key={i} style={{ display:'flex', gap:'12px', borderLeft:`2px solid ${C.violet}`, paddingLeft:'8px' }}>
-                      <span style={{ fontSize:'7px', color:C.textDim, whiteSpace:'nowrap' }}>{new Date(a.timestamp).toLocaleTimeString()}</span>
-                      <span style={{ fontSize:'8px', color:C.white }}>{a.message}</span>
-                    </div>
-                  ))
-              }
+            <div
+              style={{
+                fontSize: '9px',
+                color: C.violet,
+                letterSpacing: '3px',
+                marginBottom: '8px',
+                fontFamily: "'Oswald',sans-serif"
+              }}
+            >
+              ▸ INCIDENTS & DETECTIONS
+            </div>
+
+            <div
+              style={{
+                overflowY: 'auto',
+                maxHeight: '215px',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '6px'
+              }}
+            >
+              {combinedActivity.length === 0 ? (
+                <span style={{ fontSize:'8px', color:C.textDim, letterSpacing:'2px' }}>
+                  <span className="blink">_</span> MONITORING ALL SECTORS...
+                </span>
+              ) : (
+                combinedActivity.map((item, i) => (
+                  <div
+                    key={i}
+                    style={{
+                      display:'flex',
+                      flexDirection:'column',
+                      gap:'3px',
+                      borderLeft:`2px solid ${
+                        item.entryType === 'alert'
+                          ? C.violet
+                          : item.suspicious
+                          ? C.red
+                          : C.green
+                      }`,
+                      paddingLeft:'8px',
+                      paddingBottom:'4px'
+                    }}
+                  >
+                    {item.entryType === 'alert' ? (
+                      <>
+                        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+                          <span style={{ fontSize:'8px', color:C.violet, letterSpacing:'1px' }}>
+                            ALERT EVENT
+                          </span>
+                          <span style={{ fontSize:'7px', color:C.textDim }}>
+                            {new Date(item.timestamp).toLocaleTimeString()}
+                          </span>
+                        </div>
+                        <span style={{ fontSize:'8px', color:C.white }}>
+                          {item.message}
+                        </span>
+                      </>
+                    ) : (
+                      <>
+                        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+                          <span style={{ fontSize:'8px', color:C.white, letterSpacing:'1px' }}>
+                            CAM-0{item.camId} // {item.label.toUpperCase()}
+                          </span>
+                          <span style={{ fontSize:'7px', color:C.textDim }}>
+                            {new Date(item.timestamp).toLocaleTimeString()}
+                          </span>
+                        </div>
+
+                        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+                          <span style={{ fontSize:'7px', color:C.textDim }}>
+                            TYPE: {item.type.toUpperCase()} // CONF: {(item.confidence * 100).toFixed(0)}%
+                          </span>
+                          <span
+                            style={{
+                              fontSize:'7px',
+                              color: item.suspicious ? C.red : C.green,
+                              border:`1px solid ${item.suspicious ? C.red : C.green}44`,
+                              padding:'1px 4px',
+                              letterSpacing:'1px'
+                            }}
+                          >
+                            {item.suspicious ? 'SUSPICIOUS' : 'NORMAL'}
+                          </span>
+                        </div>
+                      </>
+                    )}
+                  </div>
+                ))
+              )}
             </div>
           </div>
         </div>
 
-        {/* Weather + infiltration */}
+        {/* Right Side */}
         <WeatherPanel />
       </div>
     </div>

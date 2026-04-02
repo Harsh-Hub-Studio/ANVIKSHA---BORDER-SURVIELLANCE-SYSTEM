@@ -9,14 +9,12 @@ CORS(app, origins="*", supports_credentials=True)
 
 face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
 
-
 def make_offline_frame(label="CAMERA OFFLINE"):
     frame = np.zeros((480, 640, 3), dtype=np.uint8)
     cv2.putText(frame, label, (120, 220), cv2.FONT_HERSHEY_SIMPLEX, 1.2, (0, 0, 200), 3)
     cv2.putText(frame, "Reconnecting...", (185, 270), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (100, 100, 100), 2)
     ret, buffer = cv2.imencode('.jpg', frame)
     return buffer.tobytes() if ret else None
-
 
 # CAM 1 — Laptop webcam with face detection
 def generate_cam1():
@@ -46,7 +44,6 @@ def generate_cam1():
     finally:
         camera.release()
 
-
 # CAM 2 — Second webcam (USB index 1)
 def generate_cam2():
     camera = cv2.VideoCapture(1)
@@ -67,7 +64,6 @@ def generate_cam2():
                 yield (b'--frame\r\nContent-Type: image/jpeg\r\n\r\n' + buffer.tobytes() + b'\r\n')
     finally:
         camera.release()
-
 
 # Generic IP cam generator with auto-reconnect
 def generate_ip_cam(ip_url, cam_label="IP CAM"):
@@ -103,7 +99,6 @@ def generate_ip_cam(ip_url, cam_label="IP CAM"):
             camera.release()
         time.sleep(2)
 
-
 # ── ROUTES ───────────────────────────────────────────────
 @app.route('/video_feed_1')
 def video_feed_1():
@@ -113,7 +108,7 @@ def video_feed_1():
 @app.route('/video_feed_2')
 def video_feed_2():
     # DroidCam phone
-    return Response(generate_ip_cam('http://10.37.60.19:4747/video', 'CAM 02'),
+    return Response(generate_ip_cam('http://192.168.1.6:4747/video', 'CAM 02'),
                     mimetype='multipart/x-mixed-replace; boundary=frame')
 
 @app.route('/video_feed_3')
@@ -123,7 +118,7 @@ def video_feed_3():
 
 @app.route('/video_feed_4')
 def video_feed_4():
-    return Response(generate_ip_cam('http://192.168.161.84:4747/video', 'CAM 04'),
+    return Response(generate_ip_cam('http://172.30.104.59:4747/video', 'CAM 04'),
                     mimetype='multipart/x-mixed-replace; boundary=frame')
 
 @app.route('/video_feed_5')
@@ -133,17 +128,17 @@ def video_feed_5():
 
 @app.route('/video_feed_6')
 def video_feed_6():
-    return Response(generate_ip_cam('http://10.37.60.138:8080/video', 'CAM 06'),
+    return Response(generate_ip_cam('http://192.168.137.240:8080/video', 'CAM 06'),
                     mimetype='multipart/x-mixed-replace; boundary=frame')
 
 @app.route('/video_feed_7')
 def video_feed_7():
-    return Response(generate_ip_cam('http://0.0.0.0:8080/video', 'CAM 07'),
+    return Response(generate_ip_cam('http://172.30.104.227:8080/video', 'CAM 07'),
                     mimetype='multipart/x-mixed-replace; boundary=frame')
 
 @app.route('/video_feed_8')
 def video_feed_8():
-    return Response(generate_ip_cam('http://0.0.0.0:8080/video', 'CAM 08'),
+    return Response(generate_ip_cam('http://172.30.104.175:8080/video', 'CAM 08'),
                     mimetype='multipart/x-mixed-replace; boundary=frame')
 
 

@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import io from 'socket.io-client';
 
-const socket = io('http://localhost:5000');
-const FLASK_IP = 'http://192.168.1.11';
+const socket = io('http://localhost:5001');
+const FLASK_IP = 'http://192.168.1.11:5001';
 
 const getMilTime = () => new Date().toTimeString().slice(0, 8).replace(/:/g, '') + 'Z';
 

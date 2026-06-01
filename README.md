@@ -7,18 +7,15 @@
 ![YOLO](https://img.shields.io/badge/YOLO-v3%20%7C%20v8-yellow.svg)
 
 ## 📖 Overview
-Traditional surveillance systems depend on continuous human monitoring and proprietary hardware, making them vulnerable to fatigue, lag, and high costs. **Anviksha** is a real-time, multi-modal surveillance platform designed to automate advanced threat detection entirely on standard commodity hardware. 
-
-The system simultaneously streams live video from heterogeneous network sources, detects human faces, identifies specific objects, vehicles, and weapons, verifies secure credentials, assesses environmental threat levels, and pushes instantaneous alerts. It achieves sub-200ms glass-to-glass latency using HTTP multipart MJPEG streaming and event-driven WebSockets.
+**Anviksha** is a real-time, multi-modal AI surveillance platform that automates advanced threat detection entirely on standard commodity hardware. It processes live video from multiple sources to detect faces, identify objects and weapons, verify credentials, and dynamically assess environmental infiltration risks—delivering instantaneous alerts with sub-200ms latency.
 
 ## ✨ Key Features
-* **Multi-Feed Surveillance**: Seamlessly monitors multiple sources (Webcams, IP Cameras, DroidCam) with auto-reconnection and fault tolerance.
+* **Multi-Feed Surveillance**: Fault-tolerant MJPEG streaming from webcams and IP cameras.
 * **Computer Vision Pipeline**:
-  * **Facial Detection & Recognition**: Viola-Jones Haar Cascades combined with an LBPH recognizer to instantly flag intruders vs. authorized personnel.
-  * **Object & Weapon Detection (Microsoft COCO)**: YOLOv3 and YOLOv8 models for robust, multi-class object, vehicle, and weapon identification. The models leverage weights pre-trained on the **Microsoft COCO (Common Objects in Context)** dataset, ensuring high-accuracy recognition across 80 standard object classes in complex environments.
-  * **Illumination-Invariant Verification**: HSV color-space segmentation for rule-based authorized ID card verification.
-* **Infiltration Risk Engine**: A proprietary Multi-Criteria Decision Analysis (MCDA) algorithm that dynamically calculates threat scores by weighing visibility-impairing atmospheric conditions (e.g., fog, moonlight, rain).
-* **Real-Time Command Dashboard**: A unified React-based command center displaying live streams, tracking incident logs, and visualizing environmental intel, powered by Socket.IO for zero-polling lag.
+  * **Face & ID Verification**: Viola-Jones Haar Cascades with LBPH recognition and HSV color-space segmentation for ID cards.
+  * **Threat Detection (COCO)**: YOLOv3 and YOLOv8 models for robust person, vehicle, and weapon identification.
+* **Environmental Risk Engine**: A Multi-Criteria Decision Analysis (MCDA) algorithm that scales threat scores based on visibility conditions (e.g., fog, rain).
+* **Zero-Latency Dashboard**: React-based command center powered by Socket.IO for real-time incident logging.
 
 ---
 
@@ -31,28 +28,10 @@ ANVIKSHA---BORDER-SURVIELLANCE-SYSTEM/
 │   ├── public/
 │   └── src/
 │       ├── components/             # Reusable UI dashboard panels
-│       │   ├── AlertHistory.css / .jsx
-│       │   ├── AnalyticsPanel.css / .jsx
-│       │   ├── CameraFeed.css / .jsx
-│       │   ├── EnvironmentalControls.css / .jsx
-│       │   ├── IncidentLogger.css / .jsx
-│       │   ├── LiveSurveillance.css / .jsx
-│       │   ├── Navbar.css / .jsx
-│       │   ├── RiskMatrix.css / .jsx
-│       │   ├── Sidebar.css / .jsx
-│       │   ├── SystemHealth.css / .jsx
-│       │   └── WeatherMetrics.css / .jsx
 │       ├── context/                # WebSocket persistent states
-│       │   └── SocketContext.jsx
 │       ├── pages/                  # Views and routing entry-points
-│       │   ├── Dashboard.css / .jsx
-│       │   ├── Homepage.css / .jsx
-│       │   └── Login.css / .jsx
 │       ├── utils/
-│       │   └── constants.js
-│       ├── App.css / .jsx
-│       ├── index.css
-│       └── main.jsx
+│       ├── App.jsx / main.jsx
 ├── runs/                           # YOLO execution runs and output logs
 ├── alerts.py                       # Socket.IO instant alert broadcast pipeline
 ├── best.pt                         # Fine-tuned YOLOv8 custom weights for weapons
@@ -71,3 +50,53 @@ ANVIKSHA---BORDER-SURVIELLANCE-SYSTEM/
 ├── update_yolo.py                  # Single-run optimization script updating object classes
 ├── yolov3.cfg                      # Darknet layers structural topology
 └── yolov3.weights                  # Darknet network parameters
+
+
+## 📂 Project Structure & Modules
+
+*(Awaiting your custom folder structure to be inserted here!)*
+
+| File / Module | Language | Description |
+| :--- | :--- | :--- |
+| `main.py` | Python | Flask server, master detection pipeline, and API endpoints. |
+| `camera.py` | Python | MJPEG streaming & auto-reconnect fallback logic. |
+| `detection.py` | Python | Haar Cascade face detection + HSV ID card detection. |
+| `yolo.py` | Python | YOLOv3 (objects) + YOLOv8 (weapons) inference engine using Microsoft COCO classes. |
+| `risk.py` | Python | MCDA weighted environmental risk scoring engine. |
+| `alerts.py` | Python | Socket.IO real-time alert push and incident logging. |
+| `train_faces.py` | Python | LBPH face recognizer suite: capture, augment, train, evaluate. |
+| `train_weapons.py` | Python | YOLOv8 weapon model automated training script. |
+| `collect_dataset.py`| Python | Dataset collection tool for faces, ID cards, and vehicles. |
+| `rename_dataset.py` | Python | Bulk rename utility for structuring training images. |
+| `update_yolo.py` | Python | Migration script adding YOLOv8 weapon detection support. |
+| `test_live.py` | Python | Live camera test environment for face and weapon detection. |
+| `frontend/` | JSX/CSS | React application containing routing, authentication, and the command dashboard. |
+
+---
+
+## ⚙️ Core Functions & Methods
+
+### `main.py`
+* **`master_detection(frame, cam_id)`**: The unified pipeline that processes every camera frame through YOLO object detection, Haar Cascade face detection, and MCDA risk scoring before evaluating alert logic.
+* **`get_current_risk()`**: Thread-safe method returning the live risk score, threat level, and environmental breakdown.
+
+### `yolo.py`
+* **`load_yolo()`**: Initializes Darknet-53 weights and classes into the OpenCV DNN backend. Maps detections against the Microsoft COCO class labels.
+* **`detect_objects(frame)`**: Executes a forward pass through YOLO layers, applies Non-Maximum Suppression (NMS), and annotates the frame.
+
+### `alerts.py`
+* **`send_alert(message, level, cam_id)`**: Emits an asynchronous JSON payload over WebSockets to all connected frontends.
+
+---
+
+## 🚀 Installation & How to Run
+
+### Prerequisites
+* **Python 3.9+** installed on your system.
+* **Node.js & npm** installed.
+* Standard Webcam or an IP Camera Network (like a smartphone with DroidCam).
+
+### Step 1: Clone the Repository
+```bash
+git clone [https://github.com/Harsh-Hub-Studio/ANVIKSHA---BORDER-SURVIELLANCE-SYSTEM.git](https://github.com/Harsh-Hub-Studio/ANVIKSHA---BORDER-SURVIELLANCE-SYSTEM.git)
+cd ANVIKSHA---BORDER-SURVIELLANCE-SYSTEM

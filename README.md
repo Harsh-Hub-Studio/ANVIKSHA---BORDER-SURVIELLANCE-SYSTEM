@@ -22,63 +22,52 @@ The system simultaneously streams live video from heterogeneous network sources,
 
 ---
 
-## 📂 Project Structure & Modules
+## 📂 Project Structure
 
-| File / Module | Language | Description |
-| :--- | :--- | :--- |
-| `main.py` | Python | Flask server, master detection pipeline, and API endpoints. |
-| `camera.py` | Python | MJPEG streaming & auto-reconnect fallback logic. |
-| `detection.py` | Python | Haar Cascade face detection + HSV ID card detection. |
-| `yolo.py` | Python | YOLOv3 (objects) + YOLOv8 (weapons) inference engine using Microsoft COCO classes. |
-| `risk.py` | Python | MCDA weighted environmental risk scoring engine. |
-| `alerts.py` | Python | Socket.IO real-time alert push and incident logging. |
-| `train_faces.py` | Python | LBPH face recognizer suite: capture, augment, train, evaluate. |
-| `train_weapons.py` | Python | YOLOv8 weapon model automated training script. |
-| `collect_dataset.py`| Python | Dataset collection tool for faces, ID cards, and vehicles. |
-| `rename_dataset.py` | Python | Bulk rename utility for structuring training images. |
-| `update_yolo.py` | Python | Migration script adding YOLOv8 weapon detection support. |
-| `test_live.py` | Python | Live camera test environment for face and weapon detection. |
-| `start_command_center.bat` | Batch | Native launcher that boots the Python API and React dashboard. |
-| `frontend/` | JSX/CSS | React application containing routing, authentication, and the command dashboard. |
-
----
-
-## ⚙️ Core Functions & Methods
-
-### `main.py`
-* **`master_detection(frame, cam_id)`**: The unified pipeline that processes every camera frame through YOLO object detection, Haar Cascade face detection, and MCDA risk scoring before evaluating alert logic.
-* **`get_current_risk()`**: Thread-safe method returning the live risk score, threat level, and environmental breakdown.
-* **`update_conditions(new_conditions)`**: REST endpoint handler for updating real-time weather metrics.
-
-### `camera.py`
-* **`generate_laptop_cam()` / `generate_usb_cam()` / `generate_ip_cam()`**: Captures frames via OpenCV, handles camera dropouts by yielding placeholder offline frames, and encodes successful frames into JPEG format for multipart HTTP boundary streaming.
-
-### `detection.py`
-* **`detect_faces(frame)`**: Scans for human faces, runs LBPH recognition to determine authorization status, and draws bounding boxes (Green = Authorized, Red = Unknown Intruder).
-* **`detect_id_card(frame)`**: Isolates predefined blue pixel ranges in the HSV color space to verify physical military/security IDs.
-* **`train_face_recognizer()`**: Automates the training of the LBPH Face Recognizer using local image datasets.
-
-### `yolo.py`
-* **`load_yolo()`**: Initializes Darknet-53 weights and classes into the OpenCV DNN backend. It maps detections against the Microsoft COCO class labels to identify persons, vehicles, and distinct threats.
-* **`detect_objects(frame)`**: Executes a forward pass through YOLO layers, applies Non-Maximum Suppression (NMS) to filter overlapping bounding boxes, and annotates the frame with classifications and confidence percentages.
-
-### `risk.py`
-* **`calculate_risk(conditions)`**: Applies the MCDA mathematical formula, summing up weighted penalties for variables like low visibility (`+15`), heavy fog (`+20`), or low light (`+25`), returning an aggregate risk score out of 100.
-
-### `alerts.py`
-* **`send_alert(message, level, cam_id)`**: Emits an asynchronous JSON payload over WebSockets to all connected frontends.
-* **`emit_detection()`**: Triggers incident log entries, frontend camera auto-zoom, and risk threat boosts dynamically.
-
----
-
-## 🚀 Installation & Setup
-
-### Prerequisites
-* Python 3.9+
-* Node.js & npm
-* Standard Webcam or IP Camera Network
-
-### 1. Clone the Repository
-```bash
-git clone [https://github.com/Harsh-Hub-Studio/ANVIKSHA---BORDER-SURVIELLANCE-SYSTEM.git](https://github.com/Harsh-Hub-Studio/ANVIKSHA---BORDER-SURVIELLANCE-SYSTEM.git)
-cd ANVIKSHA---BORDER-SURVIELLANCE-SYSTEM
+```text
+ANVIKSHA---BORDER-SURVIELLANCE-SYSTEM/
+├── dataset/                        # Stored imagery for face & vehicle samples
+├── frontend/                       # React Web Command Center
+│   ├── public/
+│   └── src/
+│       ├── components/             # Reusable UI dashboard panels
+│       │   ├── AlertHistory.css / .jsx
+│       │   ├── AnalyticsPanel.css / .jsx
+│       │   ├── CameraFeed.css / .jsx
+│       │   ├── EnvironmentalControls.css / .jsx
+│       │   ├── IncidentLogger.css / .jsx
+│       │   ├── LiveSurveillance.css / .jsx
+│       │   ├── Navbar.css / .jsx
+│       │   ├── RiskMatrix.css / .jsx
+│       │   ├── Sidebar.css / .jsx
+│       │   ├── SystemHealth.css / .jsx
+│       │   └── WeatherMetrics.css / .jsx
+│       ├── context/                # WebSocket persistent states
+│       │   └── SocketContext.jsx
+│       ├── pages/                  # Views and routing entry-points
+│       │   ├── Dashboard.css / .jsx
+│       │   ├── Homepage.css / .jsx
+│       │   └── Login.css / .jsx
+│       ├── utils/
+│       │   └── constants.js
+│       ├── App.css / .jsx
+│       ├── index.css
+│       └── main.jsx
+├── runs/                           # YOLO execution runs and output logs
+├── alerts.py                       # Socket.IO instant alert broadcast pipeline
+├── best.pt                         # Fine-tuned YOLOv8 custom weights for weapons
+├── camera.py                       # Multi-source multi-threaded MJPEG ingestion 
+├── coco.names                      # Standard 80 Microsoft COCO dataset classes
+├── collect_dataset.py              # Script to build custom facial/object tracking profiles
+├── detection.py                    # Cascade-classifiers and HSV credential filtering
+├── haarcascade_frontalface_default.xml # Pre-trained OpenCV face tracking weights
+├── main.py                         # Master Flask application server & unified pipeline
+├── rename_dataset.py               # Utility to sanitize dataset formatting for training
+├── risk.py                         # Dynamic MCDA weather score logic engine
+├── start_command_center.bat        # Concurrent dual-system microservice startup routine
+├── test_live.py                    # Independent localized validation interface
+├── train_faces.py                  # Localized LBPH facial architecture trainer suite
+├── train_weapons.py                # Specialized ultralytics customization tool
+├── update_yolo.py                  # Single-run optimization script updating object classes
+├── yolov3.cfg                      # Darknet layers structural topology
+└── yolov3.weights                  # Darknet network parameters

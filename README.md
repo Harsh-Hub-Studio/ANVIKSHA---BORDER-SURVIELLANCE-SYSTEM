@@ -1,284 +1,84 @@
-# 🛡️ ANVIKSHA — AI-Powered Border Surveillance System
+# Anviksha: AI-Based Infiltration Risk Prediction & Surveillance Decision Support System
 
-<p align="center">
-  <img src="https://img.shields.io/badge/Python-3.10+-3776AB?style=for-the-badge&logo=python&logoColor=white"/>
-  <img src="https://img.shields.io/badge/React-18-61DAFB?style=for-the-badge&logo=react&logoColor=black"/>
-  <img src="https://img.shields.io/badge/YOLOv8-Ultralytics-FF6F61?style=for-the-badge"/>
-  <img src="https://img.shields.io/badge/OpenCV-4.x-5C3EE8?style=for-the-badge&logo=opencv&logoColor=white"/>
-  <img src="https://img.shields.io/badge/Flask-REST_API-000000?style=for-the-badge&logo=flask&logoColor=white"/>
-  <img src="https://img.shields.io/badge/License-MIT-green?style=for-the-badge"/>
-</p>
+![Python](https://img.shields.io/badge/Python-3.9+-blue.svg)
+![React](https://img.shields.io/badge/React-19.2-blue.svg)
+![Flask](https://img.shields.io/badge/Flask-Backend-green.svg)
+![OpenCV](https://img.shields.io/badge/OpenCV-Computer%20Vision-red.svg)
+![YOLO](https://img.shields.io/badge/YOLO-v3%20%7C%20v8-yellow.svg)
 
-> **Anviksha** (Sanskrit: *अन्विक्षा* — investigation / surveillance) is a real-time AI surveillance system designed for border security. It combines **YOLOv3 & YOLOv8 object/weapon detection**, **LBPH face recognition**, and a **React-based Command Center dashboard** to provide autonomous threat monitoring, risk assessment, and alert generation.
+## 📖 Overview
+Traditional surveillance systems depend on continuous human monitoring and proprietary hardware, making them vulnerable to fatigue, lag, and high costs. **Anviksha** is a real-time, multi-modal surveillance platform designed to automate advanced threat detection entirely on standard commodity hardware. 
 
----
-
-## 📸 System Overview
-
-```
-Live Camera Feed
-       │
-       ▼
-┌─────────────────────────────────────────────────┐
-│              Detection Engine (Python)           │
-│  ┌──────────────┐  ┌──────────┐  ┌───────────┐  │
-│  │ YOLOv3/v8    │  │  LBPH    │  │  Risk     │  │
-│  │ Object/Weapon│  │  Face    │  │  Scoring  │  │
-│  │ Detection    │  │  Recog.  │  │  Engine   │  │
-│  └──────────────┘  └──────────┘  └───────────┘  │
-└──────────────────────┬──────────────────────────┘
-                       │ Flask REST API
-                       ▼
-         ┌─────────────────────────┐
-         │   React Command Center  │
-         │   - Live Video Stream   │
-         │   - Detection Alerts    │
-         │   - Threat Risk Level   │
-         │   - Alert History       │
-         └─────────────────────────┘
-```
-
----
+The system simultaneously streams live video from heterogeneous network sources, detects human faces, identifies specific objects, vehicles, and weapons, verifies secure credentials, assesses environmental threat levels, and pushes instantaneous alerts. It achieves sub-200ms glass-to-glass latency using HTTP multipart MJPEG streaming and event-driven WebSockets.
 
 ## ✨ Key Features
-
-| Feature | Description |
-|---|---|
-| 🎯 **Multi-Model Detection** | YOLOv3 (80-class COCO) + YOLOv8 (weapon-specific fine-tuned) |
-| 👤 **Face Recognition** | LBPH-based recognition with data-augmented training dataset |
-| ⚠️ **Risk Assessment** | Real-time threat scoring based on detected objects and identities |
-| 🚨 **Smart Alerts** | Categorised alerts (Person Detected, Weapon Found, Unknown Face) |
-| 📊 **React Dashboard** | Live video feed, alert history, risk-level visualisation |
-| 🔁 **Auto-Augmentation** | Training pipeline with flip, blur, brightness & noise augmentation |
-| 🏋️ **Custom Training** | Weapons dataset training via YOLOv8 fine-tuning |
-| 📄 **PDF Report Gen** | Auto-generate PDF documentation of the codebase |
+* **Multi-Feed Surveillance**: Seamlessly monitors multiple sources (Webcams, IP Cameras, DroidCam) with auto-reconnection and fault tolerance.
+* **Computer Vision Pipeline**:
+  * **Facial Detection & Recognition**: Viola-Jones Haar Cascades combined with an LBPH recognizer to instantly flag intruders vs. authorized personnel.
+  * **Object & Weapon Detection (Microsoft COCO)**: YOLOv3 and YOLOv8 models for robust, multi-class object, vehicle, and weapon identification. The models leverage weights pre-trained on the **Microsoft COCO (Common Objects in Context)** dataset, ensuring high-accuracy recognition across 80 standard object classes in complex environments.
+  * **Illumination-Invariant Verification**: HSV color-space segmentation for rule-based authorized ID card verification.
+* **Infiltration Risk Engine**: A proprietary Multi-Criteria Decision Analysis (MCDA) algorithm that dynamically calculates threat scores by weighing visibility-impairing atmospheric conditions (e.g., fog, moonlight, rain).
+* **Real-Time Command Dashboard**: A unified React-based command center displaying live streams, tracking incident logs, and visualizing environmental intel, powered by Socket.IO for zero-polling lag.
 
 ---
 
-## 🗂️ Project Structure
+## 📂 Project Structure & Modules
 
-```
-ANVIKSHA---BORDER-SURVIELLANCE-SYSTEM/
-│
-├── 📄 main.py                  # Main application entry point
-├── 📄 api.py                   # Flask REST API (video stream + alert endpoints)
-├── 📄 camera.py                # Camera initialisation & frame capture
-├── 📄 detection.py             # Core detection pipeline (YOLO + face)
-├── 📄 yolo.py                  # YOLOv3/v8 model interface
-├── 📄 risk.py                  # Threat risk scoring engine
-├── 📄 alerts.py                # Alert creation and management
-│
-├── 📄 train_faces.py           # Face dataset collection & LBPH model training
-├── 📄 collect_dataset.py       # Live face collection utility
-├── 📄 rename_dataset.py        # Dataset normalisation utility
-├── 📄 update_yolo.py           # YOLO model switcher (v3 ↔ v8)
-├── 📄 train_weapons.py         # YOLOv8 weapon detection fine-tuning script
-├── 📄 train_weapons.ipynb      # Jupyter notebook version of weapon training
-│
-├── 📄 coco.names               # COCO class labels (80 objects)
-├── 📄 yolov3.cfg               # YOLOv3 architecture config
-│   yolov3.weights*             # (not in repo — download separately)
-│   yolov8n.pt*                 # (not in repo — download separately)
-│   face_model.xml*             # (not in repo — Haar cascade)
-│   face_model_trained.yml*     # (not in repo — trained LBPH model)
-│
-├── 📁 authorized_faces/        # (not in repo) Face training images
-├── 📁 weapon_detection/        # Weapon detection dataset & config
-├── 📁 notebooks/               # Jupyter notebooks
-│
-├── 📁 frontend/                # React Command Center Dashboard
-│   ├── src/
-│   │   ├── pages/              # Dashboard pages (Dashboard, Alerts, etc.)
-│   │   ├── App.jsx
-│   │   └── index.css
-│   └── package.json
-│
-├── 📄 start_command_center.bat # One-click startup script (Windows)
-├── 📄 generate_pdf.py          # Codebase PDF documentation generator
-└── 📄 Anviksha_Documentation.md
-```
-
-> **\*Files marked with asterisk** are excluded from this repository due to size limits. See [Setup](#-setup--installation) for download instructions.
+| File / Module | Language | Description |
+| :--- | :--- | :--- |
+| `main.py` | Python | Flask server, master detection pipeline, and API endpoints. |
+| `camera.py` | Python | MJPEG streaming & auto-reconnect fallback logic. |
+| `detection.py` | Python | Haar Cascade face detection + HSV ID card detection. |
+| `yolo.py` | Python | YOLOv3 (objects) + YOLOv8 (weapons) inference engine using Microsoft COCO classes. |
+| `risk.py` | Python | MCDA weighted environmental risk scoring engine. |
+| `alerts.py` | Python | Socket.IO real-time alert push and incident logging. |
+| `train_faces.py` | Python | LBPH face recognizer suite: capture, augment, train, evaluate. |
+| `train_weapons.py` | Python | YOLOv8 weapon model automated training script. |
+| `collect_dataset.py`| Python | Dataset collection tool for faces, ID cards, and vehicles. |
+| `rename_dataset.py` | Python | Bulk rename utility for structuring training images. |
+| `update_yolo.py` | Python | Migration script adding YOLOv8 weapon detection support. |
+| `test_live.py` | Python | Live camera test environment for face and weapon detection. |
+| `start_command_center.bat` | Batch | Native launcher that boots the Python API and React dashboard. |
+| `frontend/` | JSX/CSS | React application containing routing, authentication, and the command dashboard. |
 
 ---
 
-## 🔧 Tech Stack
+## ⚙️ Core Functions & Methods
 
-**Backend (AI Engine)**
-- Python 3.10+
-- OpenCV (`cv2`) — video capture & image processing
-- YOLOv3 via OpenCV DNN — object detection
-- YOLOv8 via Ultralytics — weapon detection
-- LBPH Face Recognizer — face identification
-- Flask + Flask-CORS — REST API
-- NumPy, Pickle
+### `main.py`
+* **`master_detection(frame, cam_id)`**: The unified pipeline that processes every camera frame through YOLO object detection, Haar Cascade face detection, and MCDA risk scoring before evaluating alert logic.
+* **`get_current_risk()`**: Thread-safe method returning the live risk score, threat level, and environmental breakdown.
+* **`update_conditions(new_conditions)`**: REST endpoint handler for updating real-time weather metrics.
 
-**Frontend (Dashboard)**
-- React 18
-- JavaScript (ES6+)
-- CSS3
+### `camera.py`
+* **`generate_laptop_cam()` / `generate_usb_cam()` / `generate_ip_cam()`**: Captures frames via OpenCV, handles camera dropouts by yielding placeholder offline frames, and encodes successful frames into JPEG format for multipart HTTP boundary streaming.
+
+### `detection.py`
+* **`detect_faces(frame)`**: Scans for human faces, runs LBPH recognition to determine authorization status, and draws bounding boxes (Green = Authorized, Red = Unknown Intruder).
+* **`detect_id_card(frame)`**: Isolates predefined blue pixel ranges in the HSV color space to verify physical military/security IDs.
+* **`train_face_recognizer()`**: Automates the training of the LBPH Face Recognizer using local image datasets.
+
+### `yolo.py`
+* **`load_yolo()`**: Initializes Darknet-53 weights and classes into the OpenCV DNN backend. It maps detections against the Microsoft COCO class labels to identify persons, vehicles, and distinct threats.
+* **`detect_objects(frame)`**: Executes a forward pass through YOLO layers, applies Non-Maximum Suppression (NMS) to filter overlapping bounding boxes, and annotates the frame with classifications and confidence percentages.
+
+### `risk.py`
+* **`calculate_risk(conditions)`**: Applies the MCDA mathematical formula, summing up weighted penalties for variables like low visibility (`+15`), heavy fog (`+20`), or low light (`+25`), returning an aggregate risk score out of 100.
+
+### `alerts.py`
+* **`send_alert(message, level, cam_id)`**: Emits an asynchronous JSON payload over WebSockets to all connected frontends.
+* **`emit_detection()`**: Triggers incident log entries, frontend camera auto-zoom, and risk threat boosts dynamically.
 
 ---
 
-## 🚀 Setup & Installation
+## 🚀 Installation & Setup
 
 ### Prerequisites
-- Python 3.10+
-- Node.js 18+
-- Webcam or IP camera
-- *(Optional)* NVIDIA GPU for faster inference
+* Python 3.9+
+* Node.js & npm
+* Standard Webcam or IP Camera Network
 
 ### 1. Clone the Repository
-
 ```bash
-git clone https://github.com/Harsh-Hub-Studio/ANVIKSHA---BORDER-SURVIELLANCE-SYSTEM.git
+git clone [https://github.com/Harsh-Hub-Studio/ANVIKSHA---BORDER-SURVIELLANCE-SYSTEM.git](https://github.com/Harsh-Hub-Studio/ANVIKSHA---BORDER-SURVIELLANCE-SYSTEM.git)
 cd ANVIKSHA---BORDER-SURVIELLANCE-SYSTEM
-```
-
-### 2. Install Python Dependencies
-
-```bash
-pip install opencv-python opencv-contrib-python flask flask-cors ultralytics numpy pillow fpdf
-```
-
-### 3. Download Required Model Files
-
-Download and place these in the **root project directory**:
-
-| File | Source | Size |
-|------|--------|------|
-| `yolov3.weights` | [Official YOLO site](https://pjreddie.com/media/files/yolov3.weights) | ~248 MB |
-| `yolov8n.pt` | `pip install ultralytics` then auto-downloads | ~6 MB |
-| `face_model.xml` | OpenCV Haar Cascade (haarcascade_frontalface_default.xml) | ~900 KB |
-
-### 4. Install Frontend Dependencies
-
-```bash
-cd frontend
-npm install
-cd ..
-```
-
-### 5. Train the Face Recognition Model *(First-time setup)*
-
-```bash
-# Step 1: Collect face images (follow on-screen instructions)
-python collect_dataset.py
-
-# Step 2: Train the LBPH model
-python train_faces.py
-```
-
----
-
-## ▶️ Running the System
-
-### Option A — One-Click Startup (Windows)
-
-```batch
-start_command_center.bat
-```
-
-This automatically starts:
-1. Python AI backend (`main.py`)
-2. Flask API server (`api.py`)
-3. React dashboard (`npm start`)
-
-### Option B — Manual Startup
-
-**Terminal 1 — AI Backend**
-```bash
-python main.py
-```
-
-**Terminal 2 — React Dashboard**
-```bash
-cd frontend
-npm start
-```
-
-Then open **http://localhost:3000** in your browser.
-
----
-
-## 🧠 How It Works
-
-### Detection Pipeline
-
-1. **Frame Capture** — `camera.py` reads frames from webcam/IP camera using OpenCV
-2. **Object Detection** — `yolo.py` runs YOLOv3 to identify 80 COCO classes (people, vehicles, etc.)
-3. **Weapon Detection** — `yolo.py` also runs the fine-tuned YOLOv8 model for weapon-specific detection
-4. **Face Recognition** — `detection.py` detects faces with Haar Cascade, then classifies with LBPH
-5. **Risk Scoring** — `risk.py` calculates threat level based on combined detections
-6. **Alert Generation** — `alerts.py` creates timestamped alerts and sends them via the Flask API
-7. **Dashboard** — React frontend polls the API and displays live video + alerts
-
-### Risk Level Matrix
-
-| Risk Level | Triggers |
-|---|---|
-| 🟢 LOW | Authorized person detected |
-| 🟡 MEDIUM | Unknown/unrecognized person |
-| 🔴 HIGH | Weapon detected |
-| ⛔ CRITICAL | Weapon + unknown person combined |
-
----
-
-## 🏋️ Training
-
-### Face Recognition Model
-
-```bash
-python train_faces.py
-```
-- Reads images from `authorized_faces/<name>/`
-- Applies augmentation (flip, blur, brightness, noise, dark)
-- Trains OpenCV LBPH model
-- Saves `face_model_trained.yml` and `name_dict.pkl`
-
-### Weapon Detection (YOLOv8 Fine-tuning)
-
-```bash
-python train_weapons.py
-```
-- Fine-tunes YOLOv8 on custom weapon dataset in `weapon_detection/`
-- Saved model is used by the detection pipeline
-
----
-
-## 📡 API Endpoints
-
-| Endpoint | Method | Description |
-|----------|--------|-------------|
-| `/video_feed` | GET | MJPEG live video stream |
-| `/alerts` | GET | Fetch all recent alerts |
-| `/risk_level` | GET | Current threat risk level |
-| `/status` | GET | System health status |
-
----
-
-## 👥 Team
-
-| Name | Role |
-|------|------|
-| Harsh Rathod | AI/ML Backend, System Architecture |
-| Chaitanya | Frontend Dashboard, Integration |
-
----
-
-## 📜 License
-
-This project is licensed under the **MIT License** — see [LICENSE](LICENSE) for details.
-
----
-
-## 🙏 Acknowledgements
-
-- [Joseph Redmon — YOLO (You Only Look Once)](https://pjreddie.com/darknet/yolo/)
-- [Ultralytics YOLOv8](https://github.com/ultralytics/ultralytics)
-- [OpenCV — Open Source Computer Vision Library](https://opencv.org/)
-- [React](https://reactjs.org/)
-
----
-
-<p align="center">Made with ❤️ for border security — <strong>Anviksha</strong> watches so you don't have to.</p>

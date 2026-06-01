@@ -1,0 +1,16 @@
+path: weapon_detection   # root folder (relative to where you run training from)
+train: train/images
+val: val/images
+
+nc: 9  # number of weapon classes
+
+names:
+  0: Automatic Rifle
+  1: Bazooka
+  2: Grenade Launcher
+  3: Handgun
+  4: Knife
+  5: SMG
+  6: Shotgun
+  7: Sniper
+  8: Sword

@@ -152,7 +152,25 @@ def alert_id_card(cam_id, is_authorized):
 def alert_high_risk(score, level):
     """Infiltration risk score crossed threshold."""
     return send_alert(
-        f"⚠ RISK SCORE {score}/100 — {level} THREAT",
+        f"RISK SCORE {score}/100 — {level} THREAT",
         level="CRITICAL" if score >= 70 else "MED",
         cam_id=None
     )
+
+
+def emit_detection(cam_id, label, detection_type, suspicious, confidence):
+    """
+    Emit detection_event to all connected frontends.
+    Triggers: incident log entry, camera auto-zoom, risk boost.
+    """
+    event = {
+        'camId':      cam_id,
+        'label':      label,
+        'type':       detection_type,
+        'suspicious': suspicious,
+        'confidence': confidence,
+        'timestamp':  datetime.now().isoformat(),
+    }
+    if socketio:
+        socketio.emit('detection_event', event)
+    print(f"[DETECTION] CAM-{cam_id} | {label} | suspicious={suspicious} | conf={confidence:.0%}")

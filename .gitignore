@@ -1,0 +1,48 @@
+# ─── Python ───────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+dist/
+build/
+*.egg
+
+# ─── Virtual Environments ─────────────────────────────────────
+venv/
+.venv/
+env/
+
+# ─── Large Model / Weight Files (>100 MB — GitHub limit) ──────
+*.weights        # yolov3.weights (~248 MB)
+*.pt             # yolov8n.pt (~6 MB — kept small but excluded for cleanliness)
+face_model.xml   # Haar cascade XML (~92 MB)
+
+# ─── Trained Model Artifacts ──────────────────────────────────
+face_model_trained.yml
+name_dict.pkl
+
+# ─── Dataset images (thousands of augmented face photos) ──────
+authorized_faces/
+
+# ─── YOLO Training Runs ───────────────────────────────────────
+runs/
+
+# ─── Notebooks Checkpoints ────────────────────────────────────
+.ipynb_checkpoints/
+
+# ─── Generated / Temp Files ───────────────────────────────────
+test_detection.jpg
+Anviksha_Complete_Code.pdf
+*.log
+
+# ─── OS Files ─────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+
+# ─── IDE / Editor ─────────────────────────────────────────────
+.vscode/
+.idea/
+*.suo
+*.user

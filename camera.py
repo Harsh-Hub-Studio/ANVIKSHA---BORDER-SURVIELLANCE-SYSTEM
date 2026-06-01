@@ -20,7 +20,7 @@ def make_offline_frame(label="CAMERA OFFLINE"):
     frame = np.zeros((480, 640, 3), dtype=np.uint8)
     cv2.putText(frame, label,          (120, 220), cv2.FONT_HERSHEY_SIMPLEX, 1.2, (0, 0, 200), 3)
     cv2.putText(frame, "Reconnecting...",(185, 270), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (100, 100, 100), 2)
-    ret, buffer = cv2.imencode('.jpg', frame)
+    ret, buffer = cv2.imencode('.jpg', frame, [cv2.IMWRITE_JPEG_QUALITY, 70])
     return buffer.tobytes() if ret else None
 
 
@@ -57,8 +57,8 @@ def generate_laptop_cam(face_detect_fn=None):
             if face_detect_fn:
                 frame = face_detect_fn(frame)
 
-            # ── ALGORITHM 5: MJPEG FRAME ENCODING ────────────
-            ret, buffer = cv2.imencode('.jpg', frame)
+            # ── ALGORITHM 5: MJPEG FRAME ENCODING ────────
+            ret, buffer = cv2.imencode('.jpg', frame, [cv2.IMWRITE_JPEG_QUALITY, 70])
             if ret:
                 yield (b'--frame\r\n'
                        b'Content-Type: image/jpeg\r\n\r\n'
@@ -94,7 +94,7 @@ def generate_usb_cam(index=1, face_detect_fn=None):
                 frame = face_detect_fn(frame)
 
             frame = cv2.resize(frame, (640, 480))
-            ret, buffer = cv2.imencode('.jpg', frame)
+            ret, buffer = cv2.imencode('.jpg', frame, [cv2.IMWRITE_JPEG_QUALITY, 70])
             if ret:
                 yield (b'--frame\r\n'
                        b'Content-Type: image/jpeg\r\n\r\n'
@@ -156,7 +156,7 @@ def generate_ip_cam(ip_url, cam_label="IP CAM", detect_fn=None):
                 frame = cv2.resize(frame, (640, 480))
 
                 # ── ALGORITHM 5: MJPEG FRAME YIELD ───────────
-                ret, buffer = cv2.imencode('.jpg', frame)
+                ret, buffer = cv2.imencode('.jpg', frame, [cv2.IMWRITE_JPEG_QUALITY, 70])
                 if ret:
                     yield (b'--frame\r\n'
                            b'Content-Type: image/jpeg\r\n\r\n'

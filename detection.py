@@ -12,6 +12,7 @@
 import cv2
 import numpy as np
 import os
+import pickle
 
 
 # ── ALGORITHM 1: VIOLA-JONES HAAR CASCADE ────────────────────
@@ -23,10 +24,19 @@ face_cascade = cv2.CascadeClassifier(
 
 # ── FACE RECOGNITION SETUP ───────────────────────────────────
 # Load authorized faces from authorized_faces/ folder
-# Dataset: Photos of authorized personnel collected manually
-recognizer   = cv2.face.LBPHFaceRecognizer_create()
+# Requires opencv-contrib-python for cv2.face module
 label_map    = {}   # Maps label number → person name
 model_loaded = False
+
+try:
+    recognizer = cv2.face.LBPHFaceRecognizer_create()
+except AttributeError:
+    recognizer = None
+    print("[DETECTION] WARNING: opencv-contrib-python not found.")
+    print("[DETECTION] Face recognition disabled — install with:")
+    print("[DETECTION]   pip uninstall opencv-python && pip install opencv-contrib-python")
+
+NAMES_DICT_PATH = "name_dict.pkl"
 
 AUTHORIZED_FACES_DIR = "authorized_faces"
 FACE_MODEL_PATH      = "face_model.xml"
@@ -85,6 +95,9 @@ def train_face_recognizer():
         print("WARNING: No face images found in authorized_faces/")
         return False
 
+    if recognizer is None:
+        print("[DETECTION] Cannot train — cv2.face.LBPHFaceRecognizer not available.")
+        return False
     recognizer.train(faces, np.array(labels))
     recognizer.save(FACE_MODEL_PATH)
     model_loaded = True
@@ -94,13 +107,28 @@ def train_face_recognizer():
 
 
 def load_face_model():
-    """Load pre-trained face model if it exists."""
-    global model_loaded
+    """
+    Load pre-trained face model + name dictionary if they exist.
+    Also loads name_dict.pkl so label_map is always populated.
+    """
+    global model_loaded, label_map
+    if recognizer is None:
+        return False
     if os.path.exists(FACE_MODEL_PATH):
         recognizer.read(FACE_MODEL_PATH)
         model_loaded = True
-        print("Face model loaded from face_model.xml")
+        # ── FIX: Load name_dict.pkl so we know who is authorized ──
+        if os.path.exists(NAMES_DICT_PATH):
+            with open(NAMES_DICT_PATH, 'rb') as f:
+                label_map = pickle.load(f)
+            print(f"[DETECTION] Face model loaded  → {FACE_MODEL_PATH}")
+            print(f"[DETECTION] Name dict loaded   → {NAMES_DICT_PATH}")
+            print(f"[DETECTION] Authorized persons → {list(label_map.values())}")
+        else:
+            print(f"[DETECTION] Face model loaded but name_dict.pkl NOT found.")
+            print(f"[DETECTION] Run train_faces.py Step 3 to regenerate it.")
         return True
+    print("[DETECTION] face_model.xml not found — will attempt training.")
     return False
 
 
@@ -130,8 +158,9 @@ def detect_faces(frame):
 
     # ── VIOLA-JONES DETECTION ─────────────────────────────────
     # scaleFactor=1.1  → how much image is reduced at each scale
-    # minNeighbors=4   → how many neighbors each candidate needs
-    faces = face_cascade.detectMultiScale(gray, scaleFactor=1.1, minNeighbors=4, minSize=(50,50))
+    # minNeighbors=3   → lowered for better recall (was 4)
+    # minSize=(30,30)  → catch smaller/farther faces (was 50,50)
+    faces = face_cascade.detectMultiScale(gray, scaleFactor=1.1, minNeighbors=2, minSize=(30, 30))
     face_count = len(faces)
 
     for (x, y, w, h) in faces:
@@ -143,7 +172,7 @@ def detect_faces(frame):
         is_intruder = True
 
         # ── FACE RECOGNITION ─────────────────────────────────
-        if model_loaded and label_map:
+        if model_loaded and label_map and recognizer is not None:
             try:
                 label, confidence = recognizer.predict(face_roi)
                 # Lower confidence = better match (LBPH)
